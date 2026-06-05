@@ -99,6 +99,22 @@
   .ko .ksc{font-family:'Anton',sans-serif;font-size:16px;background:#121a12;border-radius:7px;
     padding:3px 9px;min-width:52px;text-align:center}
   .ko .pen{display:block;font-size:9px;color:var(--gold);letter-spacing:1px;margin-top:1px}
+  /* ── explicación del modelo ── */
+  .model{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:2px 20px;margin-top:26px}
+  .model>summary{cursor:pointer;font-family:'Anton',sans-serif;text-transform:uppercase;letter-spacing:1px;
+    font-size:16px;color:var(--lime);padding:17px 0;list-style:none}
+  .model>summary::-webkit-details-marker{display:none}
+  .model>summary::after{content:'+';float:right;color:var(--muted);font-family:'Archivo';font-weight:800}
+  .model[open]>summary::after{content:'–'}
+  .model .step{display:flex;gap:12px;margin:16px 0;align-items:flex-start}
+  .model .step .n{color:#0a0f0a;background:var(--lime);font-family:'Anton',sans-serif;font-size:15px;
+    min-width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .model h4{font-family:'Archivo';font-size:14px;color:var(--text);margin:0 0 4px;font-weight:800}
+  .model p{color:var(--muted);font-size:13px;line-height:1.65;margin:0}
+  .model code{background:#0e150e;border:1px solid var(--line);border-radius:6px;padding:1px 6px;
+    font-size:12px;color:var(--gold);font-family:ui-monospace,Menlo,monospace}
+  .model .lim{color:var(--muted);font-size:12px;line-height:1.6;border-top:1px solid var(--line);
+    margin-top:8px;padding:14px 0 18px}
 </style>
 </head>
 <body>
@@ -134,7 +150,7 @@
     fuerte todavía puede avanzar (eso depende de los otros grupos y no se modela acá).
     Pronóstico con fines de entretenimiento. ⚽
   </p>
-  <p class="note" id="versionStamp" style="margin-top:8px;opacity:.6">versión 4 · fechas oficiales + modelo por recarga</p>
+  <p class="note" id="versionStamp" style="margin-top:8px;opacity:.6">versión 5 · explicación del modelo incluida</p>
   </div><!-- /groupMode -->
 
   <div id="bracketMode" class="hidden">
@@ -155,6 +171,69 @@
       simulación al azar; las probabilidades resumen miles de torneos. Entretenimiento, no apuestas. ⚽
     </p>
   </div><!-- /bracketMode -->
+
+  <details class="model">
+    <summary>¿Cómo funciona el modelo?</summary>
+
+    <div class="step"><span class="n">1</span><div>
+      <h4>Rating tipo Elo (la fuerza de cada equipo)</h4>
+      <p>Cada selección arranca con un número que resume su nivel a junio 2026 (de ~1530 los más flojos
+      a ~2100 Argentina). Cuanto más alto, más fuerte. Es el corazón del modelo.</p>
+    </div></div>
+
+    <div class="step"><span class="n">2</span><div>
+      <h4>Bonus de localía</h4>
+      <p>Los anfitriones —México, EE.&nbsp;UU. y Canadá— suman <code>+40</code> de Elo cuando juegan,
+      para reflejar la ventaja de jugar en casa.</p>
+    </div></div>
+
+    <div class="step"><span class="n">3</span><div>
+      <h4>Factor de forma (nuevo en cada recarga)</h4>
+      <p>Al cargar la página, a cada equipo se le suma un ajuste aleatorio de <code>±28</code> Elo
+      (campana de Gauss) que simula el momento, lesiones e incertidumbre. Por eso <strong>cada refresh
+      genera un modelo distinto</strong>. La planilla de predicciones usa el modelo base, sin este ruido.</p>
+    </div></div>
+
+    <div class="step"><span class="n">4</span><div>
+      <h4>De Elo a goles esperados</h4>
+      <p>La diferencia de Elo entre dos equipos se convierte en goles esperados de cada lado partiendo
+      de <code>1.35</code> goles base: <code>λ = 1.35 ± (difElo/150)/2</code> (mínimo 0.18). Más diferencia
+      de rating → más goles esperados para el favorito.</p>
+    </div></div>
+
+    <div class="step"><span class="n">5</span><div>
+      <h4>Distribución de Poisson (los goles reales)</h4>
+      <p>Con esos goles esperados, cada partido «tira los dados» con una distribución de Poisson, que es la
+      que mejor describe cuántos goles se hacen en un partido de fútbol. Así un favorito puede empatar o
+      perder, como en la realidad.</p>
+    </div></div>
+
+    <div class="step"><span class="n">6</span><div>
+      <h4>Monte Carlo (repetir miles de veces)</h4>
+      <p>No alcanza con simular una vez: cada grupo se juega <strong>30.000 veces</strong> y el torneo
+      completo <strong>8.000 veces</strong>. Contando los resultados se obtiene la probabilidad de clasificar
+      o de salir campeón.</p>
+    </div></div>
+
+    <div class="step"><span class="n">7</span><div>
+      <h4>Desempates y eliminación directa</h4>
+      <p>En los grupos se ordena por puntos → diferencia de gol → goles a favor. En mata-mata, si hay empate
+      se define por penales con una «moneda» ponderada por Elo: <code>P(A)=1/(1+10^((EloB−EloA)/400))</code>.</p>
+    </div></div>
+
+    <div class="step"><span class="n">8</span><div>
+      <h4>Cuadro oficial FIFA 2026</h4>
+      <p>Clasifican los 2 primeros de cada grupo + los <strong>8 mejores terceros</strong>, y los cruces
+      siguen el cuadro real (partidos 73 a 104), respetando que un tercero no enfrente a un rival de su
+      propio grupo en dieciseisavos.</p>
+    </div></div>
+
+    <p class="lim">⚠️ <strong>Limitaciones honestas:</strong> los ratings son una estimación (no datos en vivo),
+    no se modelan lesiones reales, suspensiones, clima ni rachas; los penales son una aproximación.
+    Es un modelo estadístico simple y transparente, con fines de entretenimiento. ⚽</p>
+  </details>
+
+</div><!-- /wrap -->
 
 <script>
 /* ───────────── Selecciones: bandera + rating Elo aprox. (jun 2026) ───────────── */
@@ -484,7 +563,7 @@ function run(){
 }
 
 document.getElementById('modelLine').textContent=`↻ MODELO #${MODEL_ID} · nuevo en cada recarga`;
-document.getElementById('versionStamp').textContent=`versión 4 · modelo #${MODEL_ID} · con fechas oficiales`;
+document.getElementById('versionStamp').textContent=`versión 5 · modelo #${MODEL_ID} · explicación incluida`;
 
 document.getElementById('run').onclick=run;
 buildSelects();renderChips();run();
