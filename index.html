@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
 <title>Predictor de Grupos · Mundial 2026</title>
 <meta name="description" content="Simulador de la fase de grupos del Mundial 2026 con modelo Elo + Poisson y 30.000 simulaciones Monte Carlo." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -128,6 +131,7 @@
     fuerte todavía puede avanzar (eso depende de los otros grupos y no se modela acá).
     Pronóstico con fines de entretenimiento. ⚽
   </p>
+  <p class="note" style="margin-top:8px;opacity:.6">versión 2 · bracket + marcadores variables</p>
   </div><!-- /groupMode -->
 
   <div id="bracketMode" class="hidden">
@@ -211,11 +215,11 @@ function simulate(names,N){
   }));
 }
 
-/* Resultado proyectado de cada partido (marcador esperado redondeado) */
-function projected(names){
+/* Un marcador posible de cada partido (muestreado con Poisson → varía cada tirada) */
+function sampled(names){
   return PAIRS.map(([a,b])=>{
     const [la,lb]=lambdas(effElo(names[a]),effElo(names[b]));
-    return {a:names[a],b:names[b],ga:Math.round(la),gb:Math.round(lb)};
+    return {a:names[a],b:names[b],ga:poisson(la),gb:poisson(lb)};
   });
 }
 
@@ -370,7 +374,7 @@ function run(){
   btn.disabled=true;btn.innerHTML=`<span class="spin"></span>Simulando 30.000 escenarios…`;
   setTimeout(()=>{
     const res=simulate(current,30000).sort((a,b)=>b.avgPts-a.avgPts||b.advance-a.advance);
-    const proj=projected(current);
+    const proj=sampled(current);
     const states=[
       {t:"CLASIFICA",c:"var(--lime)"},{t:"CLASIFICA",c:"var(--lime)"},
       {t:"REPECHAJE 3.º",c:"var(--gold)"},{t:"ELIMINADO",c:"var(--red)"}
@@ -400,7 +404,7 @@ function run(){
           <div class="label">TABLA PROYECTADA · <span style="color:var(--text)">% de clasificar</span></div>
           <table>${rows}</table>
           <div class="matches">
-            <div class="label" style="margin-top:18px">RESULTADOS PROYECTADOS</div>
+            <div class="label" style="margin-top:18px">RESULTADO SIMULADO · <span style="color:var(--text)">varía en cada tirada</span></div>
             ${matches}
           </div>
         </div>
