@@ -68,6 +68,8 @@
   .match .mt.r{text-align:left}
   .score{font-family:'Anton',sans-serif;font-size:18px;background:#0e150e;border-radius:8px;
     padding:3px 12px;min-width:58px;text-align:center}
+  .mdate{font-size:10px;letter-spacing:1.5px;color:var(--muted);font-weight:800;
+    text-align:center;margin:9px 0 1px}
   .note{color:var(--muted);font-size:12px;line-height:1.6;margin-top:24px;text-align:center}
   a{color:var(--lime)}
   /* ── modo / toggle ── */
@@ -132,7 +134,7 @@
     fuerte todavía puede avanzar (eso depende de los otros grupos y no se modela acá).
     Pronóstico con fines de entretenimiento. ⚽
   </p>
-  <p class="note" id="versionStamp" style="margin-top:8px;opacity:.6">versión 3 · modelo regenerado por recarga</p>
+  <p class="note" id="versionStamp" style="margin-top:8px;opacity:.6">versión 4 · fechas oficiales + modelo por recarga</p>
   </div><!-- /groupMode -->
 
   <div id="bracketMode" class="hidden">
@@ -197,6 +199,59 @@ const GROUPS = {
   J:["Argentina","Austria","Argelia","Jordania"],
   K:["Portugal","Colombia","Uzbekistán","RD Congo"],
   L:["Inglaterra","Croacia","Ghana","Panamá"]
+};
+
+/* ───────────── Calendario oficial (fechas reales) ───────────── */
+/* Fase de grupos: [equipoA, equipoB, fecha] — se busca por par de equipos */
+const GROUP_FIXTURES=[
+  ["México","Sudáfrica","11 JUN"],["Corea del Sur","Chequia","11 JUN"],
+  ["Chequia","Sudáfrica","18 JUN"],["México","Corea del Sur","18 JUN"],
+  ["Chequia","México","24 JUN"],["Sudáfrica","Corea del Sur","24 JUN"],
+  ["Canadá","Bosnia y Herzegovina","12 JUN"],["Catar","Suiza","13 JUN"],
+  ["Suiza","Bosnia y Herzegovina","18 JUN"],["Canadá","Catar","18 JUN"],
+  ["Suiza","Canadá","24 JUN"],["Bosnia y Herzegovina","Catar","24 JUN"],
+  ["Brasil","Marruecos","13 JUN"],["Haití","Escocia","13 JUN"],
+  ["Escocia","Marruecos","19 JUN"],["Brasil","Haití","19 JUN"],
+  ["Escocia","Brasil","24 JUN"],["Marruecos","Haití","24 JUN"],
+  ["Estados Unidos","Paraguay","12 JUN"],["Australia","Turquía","13 JUN"],
+  ["Estados Unidos","Australia","19 JUN"],["Turquía","Paraguay","19 JUN"],
+  ["Turquía","Estados Unidos","25 JUN"],["Paraguay","Australia","25 JUN"],
+  ["Alemania","Curazao","14 JUN"],["Costa de Marfil","Ecuador","14 JUN"],
+  ["Alemania","Costa de Marfil","20 JUN"],["Ecuador","Curazao","20 JUN"],
+  ["Ecuador","Alemania","25 JUN"],["Curazao","Costa de Marfil","25 JUN"],
+  ["Países Bajos","Japón","14 JUN"],["Suecia","Túnez","14 JUN"],
+  ["Países Bajos","Suecia","20 JUN"],["Túnez","Japón","20 JUN"],
+  ["Japón","Suecia","25 JUN"],["Túnez","Países Bajos","25 JUN"],
+  ["Bélgica","Egipto","15 JUN"],["Irán","Nueva Zelanda","15 JUN"],
+  ["Bélgica","Irán","21 JUN"],["Nueva Zelanda","Egipto","21 JUN"],
+  ["Egipto","Irán","26 JUN"],["Nueva Zelanda","Bélgica","26 JUN"],
+  ["España","Cabo Verde","15 JUN"],["Arabia Saudita","Uruguay","15 JUN"],
+  ["España","Arabia Saudita","21 JUN"],["Uruguay","Cabo Verde","21 JUN"],
+  ["Cabo Verde","Arabia Saudita","26 JUN"],["Uruguay","España","26 JUN"],
+  ["Francia","Senegal","16 JUN"],["Irak","Noruega","16 JUN"],
+  ["Francia","Irak","22 JUN"],["Noruega","Senegal","22 JUN"],
+  ["Noruega","Francia","26 JUN"],["Senegal","Irak","26 JUN"],
+  ["Argentina","Argelia","16 JUN"],["Austria","Jordania","16 JUN"],
+  ["Argentina","Austria","22 JUN"],["Jordania","Argelia","22 JUN"],
+  ["Argelia","Austria","27 JUN"],["Jordania","Argentina","27 JUN"],
+  ["Portugal","RD Congo","17 JUN"],["Uzbekistán","Colombia","17 JUN"],
+  ["Portugal","Uzbekistán","23 JUN"],["Colombia","RD Congo","23 JUN"],
+  ["Colombia","Portugal","27 JUN"],["RD Congo","Uzbekistán","27 JUN"],
+  ["Inglaterra","Croacia","17 JUN"],["Ghana","Panamá","17 JUN"],
+  ["Inglaterra","Ghana","23 JUN"],["Panamá","Croacia","23 JUN"],
+  ["Panamá","Inglaterra","27 JUN"],["Croacia","Ghana","27 JUN"]
+];
+const pairKey=(a,b)=>[a,b].sort().join('|');
+const GDATE={};
+GROUP_FIXTURES.forEach(([a,b,d])=>{GDATE[pairKey(a,b)]=d;});
+function matchDate(a,b){return GDATE[pairKey(a,b)]||'';}
+
+/* Eliminación directa: nº de partido → fecha (cuadro oficial FIFA 2026) */
+const KO_DATE={
+  73:"28 JUN",74:"29 JUN",75:"29 JUN",76:"29 JUN",77:"30 JUN",78:"30 JUN",79:"30 JUN",80:"01 JUL",
+  81:"01 JUL",82:"01 JUL",83:"02 JUL",84:"02 JUL",85:"02 JUL",86:"03 JUL",87:"03 JUL",88:"03 JUL",
+  89:"04 JUL",90:"04 JUL",91:"05 JUL",92:"05 JUL",93:"06 JUL",94:"06 JUL",95:"07 JUL",96:"07 JUL",
+  97:"09 JUL",98:"10 JUL",99:"11 JUL",100:"11 JUL",101:"14 JUL",102:"15 JUL",103:"18 JUL",104:"19 JUL"
 };
 
 /* ───────────── Motor: Poisson + Monte Carlo ───────────── */
@@ -404,11 +459,14 @@ function run(){
       </tr>`;
     }).join('');
 
-    let matches=proj.map(m=>`<div class="match">
+    let matches=proj.map(m=>{
+      const d=matchDate(m.a,m.b);
+      return `${d?`<div class="mdate">${d}</div>`:''}<div class="match">
         <span class="mt">${m.a} ${T[m.a][0]}</span>
         <span class="score">${m.ga}–${m.gb}</span>
         <span class="mt r">${T[m.b][0]} ${m.b}</span>
-      </div>`).join('');
+      </div>`;
+    }).join('');
 
     outEl.innerHTML=`
       <div class="results">
@@ -426,16 +484,17 @@ function run(){
 }
 
 document.getElementById('modelLine').textContent=`↻ MODELO #${MODEL_ID} · nuevo en cada recarga`;
-document.getElementById('versionStamp').textContent=`versión 3 · modelo #${MODEL_ID} (regenerado por recarga)`;
+document.getElementById('versionStamp').textContent=`versión 4 · modelo #${MODEL_ID} · con fechas oficiales`;
 
 document.getElementById('run').onclick=run;
 buildSelects();renderChips();run();
 
 /* ───────────── UI Bracket ───────────── */
-function koRow(g){
+function koRow(g,m){
   const aw=g.winner===g.a, bw=g.winner===g.b;
   const pen=g.pen?'<span class="pen">PEN</span>':'';
-  return `<div class="ko">
+  const d=(m&&KO_DATE[m])?`<div class="mdate">${KO_DATE[m]}</div>`:'';
+  return `${d}<div class="ko">
     <span class="kt r ${aw?'win':''}"><span class="nm">${g.a}</span><span>${T[g.a][0]}</span></span>
     <span class="ksc">${g.ga}–${g.gb}${pen}</span>
     <span class="kt ${bw?'win':''}"><span>${T[g.b][0]}</span><span class="nm">${g.b}</span></span>
@@ -457,7 +516,7 @@ function renderBracket(tour,odds){
 
   let roundsHtml=tour.rounds.map(rd=>
     `<div class="rnd"><h3>${rd.name}${rd.sub?` <span>${rd.sub}</span>`:''}</h3>
-      ${rd.ms.map(m=>koRow(tour.games[m])).join('')}</div>`
+      ${rd.ms.map(m=>koRow(tour.games[m],m)).join('')}</div>`
   ).join('');
 
   document.getElementById('bracketOut').innerHTML=`
