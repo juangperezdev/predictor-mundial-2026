@@ -67,6 +67,33 @@
     padding:3px 12px;min-width:58px;text-align:center}
   .note{color:var(--muted);font-size:12px;line-height:1.6;margin-top:24px;text-align:center}
   a{color:var(--lime)}
+  /* ── modo / toggle ── */
+  .modes{display:flex;gap:8px;max-width:360px;margin:0 auto 22px}
+  .modebtn{flex:1;padding:11px;border-radius:12px;border:1px solid var(--line);background:transparent;
+    color:var(--muted);font-family:'Anton',sans-serif;font-size:15px;letter-spacing:1px;cursor:pointer;
+    text-transform:uppercase;transition:.15s}
+  .modebtn:hover{border-color:var(--lime);color:var(--text)}
+  .modebtn.active{background:var(--lime);color:#0a0f0a;border-color:var(--lime)}
+  .hidden{display:none}
+  /* ── bracket ── */
+  .champ{text-align:center;margin:4px 0 20px;animation:rise .45s ease both}
+  .champ .fl{font-size:54px;line-height:1}
+  .champ .ttl{font-family:'Anton',sans-serif;font-size:clamp(28px,8vw,46px);color:var(--gold);
+    text-transform:uppercase;line-height:1;margin-top:4px}
+  .champ .cap{font-size:11px;letter-spacing:2px;color:var(--muted);font-weight:800}
+  .rnd{margin-top:22px}
+  .rnd h3{font-family:'Anton',sans-serif;text-transform:uppercase;letter-spacing:1px;font-size:15px;
+    color:var(--lime);margin:0 0 11px;display:flex;align-items:baseline;gap:9px}
+  .rnd h3 span{color:var(--muted);font-size:10px;letter-spacing:2px;font-weight:800}
+  .ko{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line);
+    border-radius:10px;margin-bottom:7px;background:#0e150e;font-size:13.5px}
+  .ko .kt{flex:1;display:flex;align-items:center;gap:7px;min-width:0}
+  .ko .kt.r{flex-direction:row-reverse;text-align:right}
+  .ko .kt .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ko .kt.win .nm{color:var(--lime);font-weight:700}
+  .ko .ksc{font-family:'Anton',sans-serif;font-size:16px;background:#121a12;border-radius:7px;
+    padding:3px 9px;min-width:52px;text-align:center}
+  .ko .pen{display:block;font-size:9px;color:var(--gold);letter-spacing:1px;margin-top:1px}
 </style>
 </head>
 <body>
@@ -75,8 +102,14 @@
     <span class="badge"><span class="dot"></span>SIMULADOR · COPA DEL MUNDO 2026</span>
   </div>
   <h1>Predictor<br>de <span class="g">Grupos</span></h1>
-  <p class="sub">Modelo Elo + Poisson · 30.000 simulaciones Monte Carlo por grupo</p>
+  <p class="sub">Modelo Elo + Poisson · simulación Monte Carlo</p>
 
+  <div class="modes">
+    <button class="modebtn active" id="mGroups">Fase de grupos</button>
+    <button class="modebtn" id="mBracket">Bracket completo</button>
+  </div>
+
+  <div id="groupMode">
   <div class="card">
     <div class="label">CARGAR GRUPO OFICIAL (A–L)</div>
     <div class="chips" id="chips"></div>
@@ -95,7 +128,26 @@
     fuerte todavía puede avanzar (eso depende de los otros grupos y no se modela acá).
     Pronóstico con fines de entretenimiento. ⚽
   </p>
-</div>
+  </div><!-- /groupMode -->
+
+  <div id="bracketMode" class="hidden">
+    <div class="card">
+      <div class="label">SIMULACIÓN DEL TORNEO COMPLETO</div>
+      <p style="color:var(--muted);font-size:13px;line-height:1.6;margin:0 0 16px">
+        Simula los 12 grupos, ordena los <strong style="color:var(--text)">8 mejores terceros</strong>,
+        arma los dieciseisavos con el cuadro oficial FIFA 2026 y juega toda la eliminación directa hasta
+        la final. Corre miles de torneos para estimar quién levanta la copa.
+      </p>
+      <button class="btn" id="runBracket">Simular el Mundial</button>
+    </div>
+    <div id="bracketOut"></div>
+    <p class="note">
+      En eliminación directa, si un partido termina empatado se resuelve por penales con una moneda
+      ponderada por Elo. La asignación de los 8 terceros a los cruces respeta el reglamento (un tercero
+      nunca enfrenta en dieciseisavos a un rival de su propio grupo). El «cuadro de ejemplo» es <em>una</em>
+      simulación al azar; las probabilidades resumen miles de torneos. Entretenimiento, no apuestas. ⚽
+    </p>
+  </div><!-- /bracketMode -->
 
 <script>
 /* ───────────── Selecciones: bandera + rating Elo aprox. (jun 2026) ───────────── */
@@ -165,6 +217,110 @@ function projected(names){
     const [la,lb]=lambdas(effElo(names[a]),effElo(names[b]));
     return {a:names[a],b:names[b],ga:Math.round(la),gb:Math.round(lb)};
   });
+}
+
+/* ───────────── Bracket: torneo completo (FIFA 2026) ───────────── */
+const GLETTERS = Object.keys(GROUPS); // A..L
+
+/* Slots de R32 que reciben a un "mejor tercero" + grupos admitidos (cuadro oficial) */
+const THIRD_SLOTS = [
+  {m:74, groups:['A','B','C','D','F']},
+  {m:77, groups:['C','D','F','G','H']},
+  {m:79, groups:['C','E','F','H','I']},
+  {m:80, groups:['E','H','I','J','K']},
+  {m:81, groups:['B','E','F','I','J']},
+  {m:82, groups:['A','E','H','I','J']},
+  {m:85, groups:['E','F','G','I','J']},
+  {m:87, groups:['D','E','I','J','L']}
+];
+
+/* Simula un grupo una vez → standings ordenados [{name,group,pts,gd,gf}] */
+function simGroupOnce(letter){
+  const names=GROUPS[letter], elo=names.map(effElo);
+  const st=names.map((n,i)=>({i,name:n,group:letter,pts:0,gf:0,ga:0,r:Math.random()}));
+  for(const [a,b] of PAIRS){
+    const [la,lb]=lambdas(elo[a],elo[b]);
+    const ga=poisson(la),gb=poisson(lb);
+    st[a].gf+=ga;st[a].ga+=gb;st[b].gf+=gb;st[b].ga+=ga;
+    if(ga>gb)st[a].pts+=3;else if(gb>ga)st[b].pts+=3;else{st[a].pts++;st[b].pts++;}
+  }
+  st.sort((x,y)=>y.pts-x.pts||(y.gf-y.ga)-(x.gf-x.ga)||y.gf-x.gf||y.r-x.r);
+  return st.map(t=>({name:t.name,group:letter,pts:t.pts,gd:t.gf-t.ga,gf:t.gf}));
+}
+
+/* Asigna los grupos de los 8 terceros clasificados a los 8 slots (matching válido) */
+function assignThirds(thirdGroups){
+  const used=new Array(8).fill(false), res=new Array(8).fill(null);
+  (function bt(si){
+    if(si===8)return true;
+    for(let g=0;g<8;g++){
+      if(used[g]||!THIRD_SLOTS[si].groups.includes(thirdGroups[g]))continue;
+      used[g]=true;res[si]=thirdGroups[g];
+      if(bt(si+1))return true;
+      used[g]=false;res[si]=null;
+    }
+    return false;
+  })(0);
+  return res; // res[i] = letra de grupo asignada a THIRD_SLOTS[i]
+}
+
+/* Un partido de eliminación directa → {a,b,ga,gb,winner,pen} */
+function playKO(a,b){
+  const [la,lb]=lambdas(effElo(a),effElo(b));
+  let ga=poisson(la),gb=poisson(lb),pen=false,winner;
+  if(ga===gb){
+    pen=true;
+    const pa=1/(1+Math.pow(10,(effElo(b)-effElo(a))/400));
+    winner=Math.random()<pa?a:b;
+  }else winner=ga>gb?a:b;
+  return {a,b,ga,gb,winner,pen};
+}
+
+/* Simula un torneo completo. record:true devuelve el cuadro detallado para mostrar */
+function simTournament(record){
+  const W={},R={},thirds=[];
+  for(const g of GLETTERS){
+    const s=simGroupOnce(g);
+    W[g]=s[0].name;R[g]=s[1].name;thirds.push(s[2]);
+  }
+  thirds.sort((x,y)=>y.pts-x.pts||y.gd-x.gd||y.gf-x.gf||(Math.random()-.5));
+  const top8=thirds.slice(0,8);
+  const byGroup={}; top8.forEach(t=>byGroup[t.group]=t.name);
+  const assign=assignThirds(top8.map(t=>t.group)); // letra por slot
+  const TH={}; THIRD_SLOTS.forEach((s,i)=>TH[s.m]=byGroup[assign[i]]);
+
+  // Dieciseisavos (match → [equipoA, equipoB])
+  const r32def={
+    73:[R.A,R.B], 74:[W.E,TH[74]], 75:[W.F,R.C], 76:[W.C,R.F],
+    77:[W.I,TH[77]], 78:[R.E,R.I], 79:[W.A,TH[79]], 80:[W.L,TH[80]],
+    81:[W.D,TH[81]], 82:[W.G,TH[82]], 83:[R.K,R.L], 84:[W.H,R.J],
+    85:[W.B,TH[85]], 86:[W.J,R.H], 87:[W.K,TH[87]], 88:[R.D,R.G]
+  };
+  const games={};                 // nº de partido → objeto playKO
+  const win=m=>games[m].winner;
+  for(const m in r32def){games[m]=playKO(r32def[m][0],r32def[m][1]);}
+
+  const r16def={89:[74,77],90:[73,75],91:[76,78],92:[79,80],93:[83,84],94:[81,82],95:[86,88],96:[85,87]};
+  const qfDef ={97:[89,90],98:[93,94],99:[91,92],100:[95,96]};
+  const sfDef ={101:[97,98],102:[99,100]};
+  const fill=def=>{for(const m in def)games[m]=playKO(win(def[m][0]),win(def[m][1]));};
+  fill(r16def);fill(qfDef);fill(sfDef);
+  games[104]=playKO(win(101),win(102)); // final
+
+  const champion=games[104].winner;
+  const finalists=[win(101),win(102)];
+  const semis=[win(97),win(98),win(99),win(100)];
+  if(!record)return{champion,finalists,semis};
+
+  const order=def=>Object.keys(def).map(Number).sort((a,b)=>a-b);
+  return {champion,finalists,semis,games,
+    rounds:[
+      {name:'Dieciseisavos',sub:'16 PARTIDOS',ms:order(r32def)},
+      {name:'Octavos',sub:'8 PARTIDOS',ms:order(r16def)},
+      {name:'Cuartos',sub:'4 PARTIDOS',ms:order(qfDef)},
+      {name:'Semifinales',sub:'2 PARTIDOS',ms:order(sfDef)},
+      {name:'Final',sub:'',ms:[104]}
+    ]};
 }
 
 /* ───────────── UI ───────────── */
@@ -255,6 +411,90 @@ function run(){
 
 document.getElementById('run').onclick=run;
 buildSelects();renderChips();run();
+
+/* ───────────── UI Bracket ───────────── */
+function koRow(g){
+  const aw=g.winner===g.a, bw=g.winner===g.b;
+  const pen=g.pen?'<span class="pen">PEN</span>':'';
+  return `<div class="ko">
+    <span class="kt r ${aw?'win':''}"><span class="nm">${g.a}</span><span>${T[g.a][0]}</span></span>
+    <span class="ksc">${g.ga}–${g.gb}${pen}</span>
+    <span class="kt ${bw?'win':''}"><span>${T[g.b][0]}</span><span class="nm">${g.b}</span></span>
+  </div>`;
+}
+
+function renderBracket(tour,odds){
+  const f=T[tour.champion][0];
+  let oddRows=odds.slice(0,10).map((o,i)=>{
+    const barColor=i===0?'var(--gold)':i<3?'var(--lime)':'#5a6a59';
+    return `<tr class="row">
+      <td class="pos">${i+1}</td>
+      <td class="flag">${T[o.name][0]}</td>
+      <td><div class="tname">${o.name}</div>
+          <div class="tstate" style="color:var(--muted)">FINAL ${o.fin.toFixed(1)}% · SEMIS ${o.sf.toFixed(1)}%</div></td>
+      <td>${bar(o.title,barColor)}</td>
+    </tr>`;
+  }).join('');
+
+  let roundsHtml=tour.rounds.map(rd=>
+    `<div class="rnd"><h3>${rd.name}${rd.sub?` <span>${rd.sub}</span>`:''}</h3>
+      ${rd.ms.map(m=>koRow(tour.games[m])).join('')}</div>`
+  ).join('');
+
+  document.getElementById('bracketOut').innerHTML=`
+    <div class="results">
+      <div class="champ">
+        <div class="fl">${f}</div>
+        <div class="ttl">${tour.champion}</div>
+        <div class="cap">CAMPEÓN EN ESTA SIMULACIÓN</div>
+      </div>
+      <div class="card">
+        <div class="label">PROBABILIDAD DE SER CAMPEÓN · <span style="color:var(--text)">${(window.__nsim||0).toLocaleString('es')} torneos</span></div>
+        <table class="odds">${oddRows}</table>
+      </div>
+      <div class="card" style="margin-top:18px">
+        <div class="label">CUADRO DE EJEMPLO · DEL R32 A LA FINAL</div>
+        ${roundsHtml}
+      </div>
+    </div>`;
+}
+
+function runBracket(){
+  const btn=document.getElementById('runBracket');
+  btn.disabled=true;btn.innerHTML=`<span class="spin"></span>Jugando el Mundial…`;
+  setTimeout(()=>{
+    const N=8000;window.__nsim=N;
+    const title={},fin={},sf={};
+    for(const n in T){title[n]=0;fin[n]=0;sf[n]=0;}
+    for(let i=0;i<N;i++){
+      const r=simTournament(false);
+      title[r.champion]++;
+      r.finalists.forEach(n=>fin[n]++);
+      r.semis.forEach(n=>sf[n]++);
+    }
+    const odds=Object.keys(T).map(n=>({
+      name:n,title:title[n]/N*100,fin:fin[n]/N*100,sf:sf[n]/N*100
+    })).filter(o=>o.title>0||o.fin>0).sort((a,b)=>b.title-a.title||b.fin-a.fin);
+    const sample=simTournament(true); // un cuadro de ejemplo
+    renderBracket(sample,odds);
+    btn.disabled=false;btn.textContent='Simular otro Mundial';
+  },30);
+}
+document.getElementById('runBracket').onclick=runBracket;
+
+/* ───────────── Toggle de modos ───────────── */
+const mG=document.getElementById('mGroups'),mB=document.getElementById('mBracket');
+const groupMode=document.getElementById('groupMode'),bracketMode=document.getElementById('bracketMode');
+let bracketRan=false;
+mG.onclick=()=>{
+  mG.classList.add('active');mB.classList.remove('active');
+  groupMode.classList.remove('hidden');bracketMode.classList.add('hidden');
+};
+mB.onclick=()=>{
+  mB.classList.add('active');mG.classList.remove('active');
+  bracketMode.classList.remove('hidden');groupMode.classList.add('hidden');
+  if(!bracketRan){bracketRan=true;runBracket();}
+};
 </script>
 </body>
 </html>
