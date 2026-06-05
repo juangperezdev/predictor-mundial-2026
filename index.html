@@ -106,6 +106,7 @@
   </div>
   <h1>Predictor<br>de <span class="g">Grupos</span></h1>
   <p class="sub">Modelo Elo + Poisson · simulación Monte Carlo</p>
+  <p class="sub" id="modelLine" style="margin-top:-18px;color:var(--gold);font-size:12px;letter-spacing:1px;font-weight:700">↻ modelo nuevo en cada recarga</p>
 
   <div class="modes">
     <button class="modebtn active" id="mGroups">Fase de grupos</button>
@@ -131,7 +132,7 @@
     fuerte todavía puede avanzar (eso depende de los otros grupos y no se modela acá).
     Pronóstico con fines de entretenimiento. ⚽
   </p>
-  <p class="note" style="margin-top:8px;opacity:.6">versión 2 · bracket + marcadores variables</p>
+  <p class="note" id="versionStamp" style="margin-top:8px;opacity:.6">versión 3 · modelo regenerado por recarga</p>
   </div><!-- /groupMode -->
 
   <div id="bracketMode" class="hidden">
@@ -171,6 +172,17 @@ const T = {
 };
 const HOSTS = ["México","Estados Unidos","Canadá"];
 
+/* ── Factor de forma: se regenera en CADA carga → un modelo nuevo por refresh ── */
+function gauss(){ // Box-Muller (normal estándar)
+  let u=0,v=0;
+  while(u===0)u=Math.random();
+  while(v===0)v=Math.random();
+  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+}
+const FORM={};                 // ajuste Elo por selección (≈ ±28 pts, momento/lesiones/azar)
+Object.keys(T).forEach(n=>{FORM[n]=Math.round(gauss()*28);});
+const MODEL_ID=String(Math.floor(Math.random()*9000)+1000);
+
 /* ───────────── Grupos oficiales del sorteo (5 dic 2025) + repescas ───────────── */
 const GROUPS = {
   A:["México","Sudáfrica","Corea del Sur","Chequia"],
@@ -192,7 +204,7 @@ function poisson(l){const L=Math.exp(-l);let k=0,p=1;do{k++;p*=Math.random();}wh
 function lambdas(ra,rb){const s=(ra-rb)/150,b=1.35;return [Math.max(.18,b+s/2),Math.max(.18,b-s/2)];}
 const PAIRS=[[0,1],[0,2],[0,3],[1,2],[1,3],[2,3]];
 
-function effElo(name){return T[name][1]+(HOSTS.includes(name)?40:0);}
+function effElo(name){return T[name][1]+(FORM[name]||0)+(HOSTS.includes(name)?40:0);}
 
 function simulate(names,N){
   const elo=names.map(effElo);
@@ -412,6 +424,9 @@ function run(){
     btn.disabled=false;btn.textContent='Simular de nuevo';
   },30);
 }
+
+document.getElementById('modelLine').textContent=`↻ MODELO #${MODEL_ID} · nuevo en cada recarga`;
+document.getElementById('versionStamp').textContent=`versión 3 · modelo #${MODEL_ID} (regenerado por recarga)`;
 
 document.getElementById('run').onclick=run;
 buildSelects();renderChips();run();
