@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Predictor de Grupos · Mundial 2026</title>
+<meta name="description" content="Simulador de la fase de grupos del Mundial 2026 con modelo Elo + Poisson y 30.000 simulaciones Monte Carlo." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#0a0f0a; --panel:#121a12; --line:#283328;
+    --lime:#b9ff2e; --gold:#f4c84a; --text:#eef3ec; --muted:#8b988a; --red:#ff5d4d;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Archivo',sans-serif;
+    -webkit-font-smoothing:antialiased;padding:28px 16px 70px}
+  .wrap{max-width:680px;margin:0 auto}
+  .badge{display:inline-flex;align-items:center;gap:8px;font-size:11px;letter-spacing:3px;
+    color:var(--lime);font-weight:800;border:1px solid var(--line);padding:5px 12px;border-radius:30px}
+  .dot{width:7px;height:7px;border-radius:9px;background:var(--red);display:inline-block;animation:pulse 1.4s infinite}
+  @keyframes pulse{0%,100%{opacity:.35}50%{opacity:1}}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  h1{font-family:'Anton',sans-serif;font-size:clamp(38px,9vw,62px);text-align:center;
+    margin:10px 0 2px;line-height:.92;letter-spacing:1;text-transform:uppercase}
+  h1 .g{color:var(--lime)}
+  .sub{text-align:center;color:var(--muted);font-size:14px;margin:0 0 24px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:20px}
+  .label{font-size:11px;letter-spacing:2px;color:var(--muted);font-weight:800;margin-bottom:10px}
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:6px}
+  .chip{font-family:'Anton',sans-serif;font-size:15px;letter-spacing:1px;cursor:pointer;
+    background:transparent;color:var(--muted);border:1px solid var(--line);
+    width:40px;height:40px;border-radius:11px;transition:.15s}
+  .chip:hover{border-color:var(--lime);color:var(--text)}
+  .chip.active{background:var(--lime);color:#0a0f0a;border-color:var(--lime)}
+  .selects{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0}
+  select{width:100%;background:#0e150e;color:var(--text);border:1px solid var(--line);
+    border-radius:12px;padding:13px 12px;font-size:15px;font-family:'Archivo';font-weight:600;
+    outline:none;cursor:pointer;appearance:none}
+  select:focus{border-color:var(--lime)}
+  .btn{width:100%;padding:17px;border-radius:14px;border:none;cursor:pointer;
+    font-family:'Anton',sans-serif;font-size:20px;letter-spacing:1px;text-transform:uppercase;
+    background:var(--lime);color:#0a0f0a;display:flex;align-items:center;justify-content:center;gap:12px}
+  .btn:disabled{background:var(--line);color:var(--muted);cursor:default}
+  .spin{width:18px;height:18px;border:3px solid #0a0f0a44;border-top-color:var(--lime);
+    border-radius:20px;animation:spin .8s linear infinite}
+  .results{margin-top:24px;animation:rise .45s ease both}
+  table{width:100%;border-collapse:collapse}
+  .row{border-bottom:1px solid var(--line)}
+  .row td{padding:13px 8px;vertical-align:middle}
+  .pos{font-family:'Anton',sans-serif;font-size:20px;width:34px;text-align:center}
+  .flag{font-size:26px;width:34px;text-align:center}
+  .tname{font-family:'Anton',sans-serif;font-size:16px;text-transform:uppercase;letter-spacing:.5px}
+  .tstate{font-size:10px;letter-spacing:1.5px;font-weight:800;margin-top:2px}
+  .barwrap{position:relative;height:24px;background:#0e150e;border-radius:7px;overflow:hidden;min-width:90px}
+  .bar{height:100%;border-radius:7px}
+  .barlbl{position:absolute;top:0;right:8px;line-height:24px;font-size:12px;font-weight:800;color:var(--text)}
+  .pts{font-family:'Anton',sans-serif;font-size:18px;text-align:center;width:46px}
+  .matches{margin-top:20px}
+  .match{display:flex;align-items:center;justify-content:center;gap:10px;padding:9px 0;
+    border-bottom:1px solid var(--line);font-size:14px}
+  .match .mt{flex:1;text-align:right}
+  .match .mt.r{text-align:left}
+  .score{font-family:'Anton',sans-serif;font-size:18px;background:#0e150e;border-radius:8px;
+    padding:3px 12px;min-width:58px;text-align:center}
+  .note{color:var(--muted);font-size:12px;line-height:1.6;margin-top:24px;text-align:center}
+  a{color:var(--lime)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div style="text-align:center">
+    <span class="badge"><span class="dot"></span>SIMULADOR · COPA DEL MUNDO 2026</span>
+  </div>
+  <h1>Predictor<br>de <span class="g">Grupos</span></h1>
+  <p class="sub">Modelo Elo + Poisson · 30.000 simulaciones Monte Carlo por grupo</p>
+
+  <div class="card">
+    <div class="label">CARGAR GRUPO OFICIAL (A–L)</div>
+    <div class="chips" id="chips"></div>
+
+    <div class="selects" id="selects"></div>
+
+    <button class="btn" id="run">Simular grupo</button>
+  </div>
+
+  <div id="out"></div>
+
+  <p class="note">
+    Cada selección tiene un rating estilo Elo; cada partido proyecta goles con una distribución de
+    Poisson y se simula el grupo 30.000 veces. Los anfitriones (México, EE.&nbsp;UU., Canadá) reciben
+    un bonus de localía. Recordá: clasifican los 2 primeros + los 8 mejores terceros, así que un 3.º
+    fuerte todavía puede avanzar (eso depende de los otros grupos y no se modela acá).
+    Pronóstico con fines de entretenimiento. ⚽
+  </p>
+</div>
+
+<script>
+/* ───────────── Selecciones: bandera + rating Elo aprox. (jun 2026) ───────────── */
+const T = {
+  "Argentina":["🇦🇷",2100],"Francia":["🇫🇷",2080],"España":["🇪🇸",2070],"Brasil":["🇧🇷",2020],
+  "Inglaterra":["🏴󠁧󠁢󠁥󠁮󠁧󠁿",2010],"Portugal":["🇵🇹",2000],"Países Bajos":["🇳🇱",1980],"Alemania":["🇩🇪",1960],
+  "Bélgica":["🇧🇪",1930],"Croacia":["🇭🇷",1900],"Uruguay":["🇺🇾",1900],"Colombia":["🇨🇴",1890],
+  "Marruecos":["🇲🇦",1870],"Japón":["🇯🇵",1850],"Suiza":["🇨🇭",1840],"Senegal":["🇸🇳",1840],
+  "Noruega":["🇳🇴",1830],"Ecuador":["🇪🇨",1820],"México":["🇲🇽",1810],"Turquía":["🇹🇷",1810],
+  "Estados Unidos":["🇺🇸",1800],"Austria":["🇦🇹",1790],"Corea del Sur":["🇰🇷",1790],"Argelia":["🇩🇿",1780],
+  "Suecia":["🇸🇪",1770],"Costa de Marfil":["🇨🇮",1760],"Irán":["🇮🇷",1760],"Escocia":["🏴󠁧󠁢󠁳󠁣󠁴󠁿",1760],
+  "Chequia":["🇨🇿",1760],"Egipto":["🇪🇬",1750],"Canadá":["🇨🇦",1730],"Australia":["🇦🇺",1730],
+  "Paraguay":["🇵🇾",1720],"Bosnia y Herzegovina":["🇧🇦",1720],"Sudáfrica":["🇿🇦",1700],"Túnez":["🇹🇳",1690],
+  "Catar":["🇶🇦",1680],"Ghana":["🇬🇭",1680],"RD Congo":["🇨🇩",1680],"Uzbekistán":["🇺🇿",1660],
+  "Panamá":["🇵🇦",1650],"Jordania":["🇯🇴",1640],"Arabia Saudita":["🇸🇦",1640],"Cabo Verde":["🇨🇻",1620],
+  "Irak":["🇮🇶",1610],"Curazao":["🇨🇼",1560],"Nueva Zelanda":["🇳🇿",1560],"Haití":["🇭🇹",1530]
+};
+const HOSTS = ["México","Estados Unidos","Canadá"];
+
+/* ───────────── Grupos oficiales del sorteo (5 dic 2025) + repescas ───────────── */
+const GROUPS = {
+  A:["México","Sudáfrica","Corea del Sur","Chequia"],
+  B:["Canadá","Suiza","Catar","Bosnia y Herzegovina"],
+  C:["Brasil","Marruecos","Escocia","Haití"],
+  D:["Estados Unidos","Paraguay","Australia","Turquía"],
+  E:["Alemania","Ecuador","Costa de Marfil","Curazao"],
+  F:["Países Bajos","Japón","Suecia","Túnez"],
+  G:["Bélgica","Egipto","Irán","Nueva Zelanda"],
+  H:["España","Uruguay","Arabia Saudita","Cabo Verde"],
+  I:["Francia","Senegal","Noruega","Irak"],
+  J:["Argentina","Austria","Argelia","Jordania"],
+  K:["Portugal","Colombia","Uzbekistán","RD Congo"],
+  L:["Inglaterra","Croacia","Ghana","Panamá"]
+};
+
+/* ───────────── Motor: Poisson + Monte Carlo ───────────── */
+function poisson(l){const L=Math.exp(-l);let k=0,p=1;do{k++;p*=Math.random();}while(p>L);return k-1;}
+function lambdas(ra,rb){const s=(ra-rb)/150,b=1.35;return [Math.max(.18,b+s/2),Math.max(.18,b-s/2)];}
+const PAIRS=[[0,1],[0,2],[0,3],[1,2],[1,3],[2,3]];
+
+function effElo(name){return T[name][1]+(HOSTS.includes(name)?40:0);}
+
+function simulate(names,N){
+  const elo=names.map(effElo);
+  const p1=[0,0,0,0],p2=[0,0,0,0],p3=[0,0,0,0],ptsSum=[0,0,0,0];
+  for(let s=0;s<N;s++){
+    const st=names.map((n,i)=>({i,pts:0,gf:0,ga:0,r:Math.random()}));
+    for(const [a,b] of PAIRS){
+      const [la,lb]=lambdas(elo[a],elo[b]);
+      const ga=poisson(la),gb=poisson(lb);
+      st[a].gf+=ga;st[a].ga+=gb;st[b].gf+=gb;st[b].ga+=ga;
+      if(ga>gb){st[a].pts+=3;} else if(gb>ga){st[b].pts+=3;} else {st[a].pts++;st[b].pts++;}
+    }
+    st.sort((x,y)=>y.pts-x.pts||(y.gf-y.ga)-(x.gf-x.ga)||y.gf-x.gf||y.r-x.r);
+    p1[st[0].i]++;p2[st[1].i]++;p3[st[2].i]++;
+    st.forEach(t=>ptsSum[t.i]+=t.pts);
+  }
+  return names.map((n,i)=>({
+    name:n, p1:p1[i]/N*100, advance:(p1[i]+p2[i])/N*100,
+    p3:p3[i]/N*100, avgPts:ptsSum[i]/N
+  }));
+}
+
+/* Resultado proyectado de cada partido (marcador esperado redondeado) */
+function projected(names){
+  return PAIRS.map(([a,b])=>{
+    const [la,lb]=lambdas(effElo(names[a]),effElo(names[b]));
+    return {a:names[a],b:names[b],ga:Math.round(la),gb:Math.round(lb)};
+  });
+}
+
+/* ───────────── UI ───────────── */
+const allNames=Object.keys(T).sort((a,b)=>a.localeCompare(b,'es'));
+const selectsEl=document.getElementById('selects');
+const chipsEl=document.getElementById('chips');
+const outEl=document.getElementById('out');
+let current=GROUPS.J.slice(); // arranca con el grupo de Argentina
+let activeChip='J';
+
+function buildSelects(){
+  selectsEl.innerHTML='';
+  current.forEach((name,idx)=>{
+    const sel=document.createElement('select');
+    allNames.forEach(n=>{
+      const o=document.createElement('option');
+      o.value=n;o.textContent=`${T[n][0]}  ${n}`;
+      if(n===name)o.selected=true;
+      sel.appendChild(o);
+    });
+    sel.onchange=()=>{current[idx]=sel.value;activeChip=null;renderChips();};
+    selectsEl.appendChild(sel);
+  });
+}
+function renderChips(){
+  chipsEl.innerHTML='';
+  Object.keys(GROUPS).forEach(g=>{
+    const b=document.createElement('button');
+    b.className='chip'+(activeChip===g?' active':'');b.textContent=g;
+    b.onclick=()=>{current=GROUPS[g].slice();activeChip=g;buildSelects();renderChips();run();};
+    chipsEl.appendChild(b);
+  });
+}
+
+function bar(pct,color){
+  const w=Math.max(2,pct);
+  return `<div class="barwrap"><div class="bar" style="width:${w}%;background:${color}"></div>
+    <span class="barlbl">${pct.toFixed(0)}%</span></div>`;
+}
+
+function run(){
+  const btn=document.getElementById('run');
+  if(new Set(current).size<4){
+    outEl.innerHTML=`<p style="color:var(--red);text-align:center;margin-top:16px">Elegí 4 selecciones distintas.</p>`;
+    return;
+  }
+  btn.disabled=true;btn.innerHTML=`<span class="spin"></span>Simulando 30.000 escenarios…`;
+  setTimeout(()=>{
+    const res=simulate(current,30000).sort((a,b)=>b.avgPts-a.avgPts||b.advance-a.advance);
+    const proj=projected(current);
+    const states=[
+      {t:"CLASIFICA",c:"var(--lime)"},{t:"CLASIFICA",c:"var(--lime)"},
+      {t:"REPECHAJE 3.º",c:"var(--gold)"},{t:"ELIMINADO",c:"var(--red)"}
+    ];
+    let rows=res.map((r,i)=>{
+      const f=T[r.name][0];
+      const barColor=i<2?'var(--lime)':i<3?'var(--gold)':'#5a6a59';
+      return `<tr class="row" style="border-left:3px solid ${states[i].c}">
+        <td class="pos" style="color:${states[i].c}">${i+1}</td>
+        <td class="flag">${f}</td>
+        <td><div class="tname">${r.name}</div>
+            <div class="tstate" style="color:${states[i].c}">${states[i].t} · ${r.p1.toFixed(0)}% 1.º</div></td>
+        <td class="pts">${r.avgPts.toFixed(1)}</td>
+        <td>${bar(r.advance,barColor)}</td>
+      </tr>`;
+    }).join('');
+
+    let matches=proj.map(m=>`<div class="match">
+        <span class="mt">${m.a} ${T[m.a][0]}</span>
+        <span class="score">${m.ga}–${m.gb}</span>
+        <span class="mt r">${T[m.b][0]} ${m.b}</span>
+      </div>`).join('');
+
+    outEl.innerHTML=`
+      <div class="results">
+        <div class="card">
+          <div class="label">TABLA PROYECTADA · <span style="color:var(--text)">% de clasificar</span></div>
+          <table>${rows}</table>
+          <div class="matches">
+            <div class="label" style="margin-top:18px">RESULTADOS PROYECTADOS</div>
+            ${matches}
+          </div>
+        </div>
+      </div>`;
+    btn.disabled=false;btn.textContent='Simular de nuevo';
+  },30);
+}
+
+document.getElementById('run').onclick=run;
+buildSelects();renderChips();run();
+</script>
+</body>
+</html>
